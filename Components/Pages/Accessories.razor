@@ -1,0 +1,146 @@
+﻿@page "/accessories"
+@using BlazorBootstrap
+@using Projekt.Database
+@using Projekt.Items
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using Microsoft.EntityFrameworkCore
+@inject Database db
+@inject IJSRuntime JS
+@rendermode InteractiveServer
+
+<PageTitle>My Games and more</PageTitle>
+
+<h1>Accessories</h1>
+
+<QuickGrid @ref="Grid" Class="table table-striped m-0"
+           Items="@db.Accessories"
+           ItemKey="@(x => x.ID)">
+    <PropertyColumn Title="ID"
+                    Property="@(x => x.ID)"
+                    Sortable="true"/>
+    <PropertyColumn Title="Title"
+                    Property="@(x => x.Name)"
+                    Sortable="true"/>
+    <PropertyColumn Title="Platform"
+                    Property="@(x => x.Platform)"
+                    Sortable="true"/>
+    <PropertyColumn Title="Colour"
+                    Property="@(x => x.Colour)"/>
+    <PropertyColumn Title="Value"
+                    Property="@(x => x.ValueOfItem)"/>
+    <TemplateColumn>
+        <div>
+            <a @onclick="async() => await Delete(context)">
+                <span class="bi bi-trash" aria-hidden="true" style="color: #a52834"></span>
+            </a>
+        </div>
+    </TemplateColumn>
+</QuickGrid>
+<Modal @ref="modal" title="Add Accessory" IsVerticallyCentered="true">
+    <BodyTemplate>
+        <form method="post" @onsubmit="async() => await Submit(Acc)" @formname="starship-plain-form">
+            <AntiforgeryToken/>
+            <div>
+                <label class="form-label" style="width: 100%">
+                    Name:
+                    <InputText class="form-control" style="border-color: #A9A9A9" @bind-Value="Acc!.Name"/>
+                </label>
+            </div>
+            <div>
+                <label class="form-label" style="width: 100%">
+                    Platform:
+                    <select class="form-control" style="border-color: #A9A9A9" @bind="Acc!.Platform">
+                        @foreach (var platform in Methods.values)
+                        {
+                            <option value="@platform">@platform</option>
+                        }
+                    </select>
+                </label>
+            </div>
+            <div>
+                <label class="form-label" style="width: 100%">
+                    Colour:
+                    <InputText class="form-control" style="border-color: #A9A9A9" @bind-Value="Acc!.Colour"/>
+                </label>
+            </div>
+            <div>
+                <label class="form-label" style="width: 100%">
+                    Value:
+                    <InputText class="form-control" style="border-color: #A9A9A9" @bind-Value="Acc!.ValueOfItem"/>
+                </label>
+            </div>
+            <div>
+                <button class="btn btn-secondary" @onclick="OnHideModalClick" type="submit">Add</button>
+            </div>
+        </form>
+    </BodyTemplate>
+</Modal>
+<br/>
+<div style="display: flex; flex-direction: row; align-items: flex-start">
+    <Button Color="ButtonColor.Secondary" @onclick="OnShowModalClick">Add</Button>
+    <div style="margin-left: auto; display: flex; flex-direction: column; align-items: flex-start;">
+        <p style="margin-bottom: 0.5rem; text-align: right; width: 100%">
+            Total accessories: @count
+        </p>
+    </div>
+</div>
+
+@code {
+    QuickGrid<Accessory> Grid;
+    
+    private Modal modal = default!;
+
+    private int count = 0;
+
+    public async Task OnShowModalClick()
+    {
+        Acc = new Accessory();
+        await modal.ShowAsync();
+    }
+
+    public async Task OnHideModalClick()
+    {
+        await modal.HideAsync();
+    }
+    
+    [SupplyParameterFromForm]
+    private Accessory? Acc { get; set; }
+
+    protected override void OnInitialized()
+    {
+        Acc ??= new();
+        count = db.Accessories.Count();
+    } 
+
+    private async Task Submit(Accessory accessory)
+    {
+        if(accessory.ValueOfItem == null)
+        {
+            accessory.ValueOfItem = "N/A";
+        }
+        if (string.IsNullOrWhiteSpace(Acc.Name) || 
+            string.IsNullOrWhiteSpace(Acc.Colour) ||
+            string.IsNullOrWhiteSpace(Acc.Platform))
+        {
+            await JS.InvokeVoidAsync("alert", "Something went wrong, try to fill all parameters");
+            var entry = db.Entry(Acc);
+            if (entry.State != EntityState.Detached)
+            {
+                entry.State = EntityState.Detached;
+            }
+            return;
+        }
+        db.Accessories.Add(accessory);
+        await db.SaveChangesAsync();
+        await Grid.RefreshDataAsync();
+        ++count;
+    }
+    
+    private async Task Delete(Accessory accessory)
+    {
+        db.Accessories.Remove(accessory);
+        await db.SaveChangesAsync();
+        await Grid.RefreshDataAsync();
+        --count;
+    }
+}
